@@ -4,7 +4,6 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.net.Socket;
 import java.util.Objects;
-import java.util.Scanner;
 
 /**
  * Thread to handle input stream from the client socket
@@ -14,55 +13,41 @@ public class ClientThread extends Thread {
      * Points to the socket of the client which has made connection to this server socket
      */
     private Socket client;
-    private String key;
     private volatile boolean exit = false;
 
-    public ClientThread(Socket client, String key) {
+    public ClientThread(Socket client) {
         this.client = client;
-        this.key = key;
     }
 
     public void run() {
-        // Used to store the message read from the input stream
-        byte[] encoded;
-        byte[] message;
-        byte[] decoded;
-        byte[] key;
-        int read;
-
         try {
             while (!exit) {
+                // https://developer.mozilla.org/en-US/docs/Web/API/WebSockets_API/Writing_a_WebSocket_server_in_Java
+                // https://tools.ietf.org/html/rfc6455#section-5.2
+                // # Decoding a message
                 InputStream is = client.getInputStream();
-                message = new byte[1024];
-                read = is.read(message);
-
-                System.out.println("RECEIVED: " + read+":"+message[0]);
-                if (message[0] == (byte) 129) {
-                    int secondByteDifference = message[1] - 128;
-                    int lengthOfTheMessage = 0;
-                    if (secondByteDifference > 0 &&
-                            secondByteDifference <= 125) {
-                        lengthOfTheMessage = secondByteDifference;
+                byte[] data = new byte[1024];
+                int read = is.read(data);
+                // First byte should be 129
+                // Convert byte to unsigned integer
+                int firstByte = data[0] & 0xff;
+                if (firstByte == 129) {
+                    if (read < 0) {
+                        this.terminate();
+                        break;
                     }
-
-                    if (lengthOfTheMessage > 0) {
-                        key = new byte[4];
-                        encoded = new byte[lengthOfTheMessage];
-                        decoded = new byte[encoded.length];
-                        System.arraycopy(message, 2, key, 0, 4);
-                        System.arraycopy(message, 6, encoded, 0, lengthOfTheMessage);
-
-                        for (int i = 0; i < encoded.length; i++) {
-                            decoded[i] = (byte) (encoded[i] ^ key[i & 0x3]);
-                        }
-
-                        System.out.println("RECEIVED2: " + new String(decoded));
-                        if (read < 0) {
-                            this.terminate();
-                            continue;
-                        }
-                        TCPServer.broadcastMessage(this, encoded);
+                    // Size of the message
+                    // As per RFC6455
+                    int sizeOfMessage = (data[1] & 0xff) - 128;
+                    byte[] decoded = new byte[sizeOfMessage];
+                    byte[] key = new byte[]{data[2], data[3], data[4], data[5]};
+                    for (int i = 0; i < sizeOfMessage; i++) {
+                        decoded[i] = (byte) (data[i + 6] ^ key[i & 0x3]);
                     }
+                    TCPServer.broadcastMessage(this, decoded);
+                } else {
+                    this.terminate();
+                    break;
                 }
             }
         } catch (IOException e) {

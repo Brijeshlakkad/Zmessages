@@ -1,12 +1,19 @@
-var ws;
+let ws;
+let username;
+let messageId = 0;
 
 function setConnected(connected) {
-    $("#connect").prop("disabled", connected);
-    $("#disconnect").prop("disabled", !connected);
+    console.log("setConnected");
+    if (connected) {
+        $("#connect").hide();
+        $("#disconnect").show();
+    } else {
+        $("#connect").show();
+        $("#disconnect").hide();
+    }
 }
 
 function connect() {
-    // return new Promise((resolve, reject) => {
     ws = new WebSocket("ws://localhost:9999");
     console.log(ws)
     ws.onopen = () => {
@@ -14,15 +21,16 @@ function connect() {
         setConnected(true);
     };
     ws.onmessage = function (data) {
-        helloWorld(data.data);
+        let dataObj = JSON.parse(data.data);
+        if (dataObj.username)
+            handleMessage(dataObj.username, dataObj.message);
     }
     ws.onclose = function (evt) {
-        console.log("I'm sorry. Bye!");
+        alert('Bye!')
     };
     ws.onerror = error => {
-        console.error("ERROR while connecting to the socket")
+        alert("Error occurred while connecting!")
     };
-    // });
 }
 
 function disconnect() {
@@ -34,17 +42,47 @@ function disconnect() {
 }
 
 function sendData() {
-    var data = JSON.stringify({
-        'user': $("#user").val()
+    if (!ws) {
+        alert("You are not connected!");
+        return;
+    }
+    let message = $("#message").val();
+    if(!message){
+        alert("Message cannot be empty!");
+        return;
+    }
+    let data = JSON.stringify({
+        username: username ? username : "anonymous",
+        message: message
     })
+    handleMessage("You", message);
     ws.send(data);
+    $("#message").val("");
 }
 
-function helloWorld(message) {
-    $("#helloworldmessage").append(" " + message + "");
+function handleMessage(senderUsername, message) {
+    if (messageId === 0) {
+        $("#message-container").html("");
+    }
+    $("#message-container").append(`<div id="'message'+messageId">
+        <span class='sender'>${senderUsername}</span>
+        <td>${message}</td>
+        </div>`);
+    messageId++;
+}
+
+function getWelcomeText() {
+    if (username) return "Welcome " + username;
+    return "Welcome";
+}
+
+function setWelcomeText() {
+    $("#welcome-text").html(getWelcomeText())
 }
 
 $(function () {
+    setConnected(false);
+    setWelcomeText();
     $("form").on('submit', function (e) {
         e.preventDefault();
     });
@@ -54,7 +92,11 @@ $(function () {
     $("#disconnect").click(function () {
         disconnect();
     });
-    $("#send").click(function () {
+    $("#send-btn").click(function () {
         sendData();
+    });
+    $("#username").on("change", function (inputFieldRef) {
+        username = inputFieldRef.target.value;
+        setWelcomeText();
     });
 });

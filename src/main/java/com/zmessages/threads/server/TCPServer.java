@@ -50,23 +50,15 @@ public class TCPServer {
                     // Gets the output stream of the client socket to write the message
                     OutputStream os = clientThread.getClient().getOutputStream();
 
-                    // Could not decode a text frame as UTF-8
-
                     // section 5.1 of RFC 6455 does mention
                     // server should not mask the message
                     // https://tools.ietf.org/html/rfc6455
                     // https://stackoverflow.com/questions/16932662/websockets-disconnects-on-server-message
                     byte[] send = new byte[bytes.length + 2];
-                    send[0] = (byte) 0x81; // last frame, text
-                    send[1] = (byte) bytes.length; // not masked, length of the next bytes
+                    send[0] = (byte) 0x81; // first frame for text message
+                    send[1] = (byte) bytes.length; // not masked, the total length of the next bytes
                     System.arraycopy(bytes, 0, send, 2, bytes.length);
-//                    PrintWriter out = new PrintWriter(
-//                            new BufferedWriter(new OutputStreamWriter(
-//                                    os, StandardCharsets.UTF_8)), true);
-//                    out.println(new String(send));
-//                    out.flush();
-                    byte[] processedMessage = new String(send).getBytes(StandardCharsets.UTF_8);
-                    os.write(processedMessage, 0, send.length);
+                    os.write(send, 0, send.length);
                 } catch (IOException e) {
                     e.printStackTrace();
                 }

@@ -64,8 +64,8 @@ public class SocketServer extends Thread {
                 } catch (Exception ignored) {
                     System.out.println("Handshake failed");
                 }
-                if(!key.isEmpty()){
-                    ClientThread clientThread = new ClientThread(client, key);
+                if (!key.isEmpty()) {
+                    ClientThread clientThread = new ClientThread(client);
                     clientThread.start();
 
                     // Add the client socket to the list of active clients
